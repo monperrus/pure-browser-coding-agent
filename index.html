@@ -494,28 +494,7 @@ function saveMessages() {
   localStorage.setItem(MSGS_KEY, JSON.stringify(messages));
 }
 
-const SYSTEM_PROMPT = `You are a browser-based coding agent. You have access to the following tools:
-
-## Tool: read_file(path)
-Read the contents of a file. Returns the file content or an error.
-
-## Tool: write_file(path, content)
-Create or overwrite a file with the given content.
-
-## Tool: str_replace(path, old_str, new_str)
-Replace the FIRST occurrence of old_str with new_str in the specified file. Use this for making targeted edits.
-
-## Tool: execute_js(code)
-Execute JavaScript code in a sandboxed browser environment. All browser APIs are available (DOM, fetch, console, etc.). The code runs in an async wrapper so you can use top-level await. Returns stdout/stderr output and the return value.
-
-## Tool: list_files()
-List all files in the workspace.
-
-## Tool: delete_file(path)
-Delete a file from the workspace.
-
-## Tool: finish(message)
-Call this when you have completed the user's request. Provide a summary of what was done.
+const SYSTEM_PROMPT = `You are a browser-based coding agent. You have access to tools for reading/writing files, executing JavaScript, and more. Use the provided tools to complete the user's request. When finished, reply in plain text.
 
 ## Guidelines:
 - Always read a file before editing it.
@@ -523,27 +502,126 @@ Call this when you have completed the user's request. Provide a summary of what 
 - When writing code, prefer clean, well-structured solutions.
 - Use execute_js to test code and verify it works.
 - You can create HTML files and open them in a new tab using: window.open(URL.createObjectURL(new Blob([content], {type:'text/html'})))
-- Be thorough and test your work.
+- Be thorough and test your work.`;
 
-## Response Format
-You MUST respond with a JSON object containing your response. The format is:
-{
-  "message": "Your text response to the user",
-  "tool_calls": [
-    {
-      "tool": "tool_name",
-      "params": { ... }
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description: "Read the contents of a file. Returns the file content or an error.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path to the file." }
+        },
+        required: ["path"]
+      }
     }
-  ]
-}
-
-If you don't need to call any tools, set tool_calls to an empty array.
-Always respond with valid JSON.`;
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "Create or overwrite a file with the given content.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path to the file." },
+          content: { type: "string", description: "Content to write." }
+        },
+        required: ["path", "content"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "str_replace",
+      description: "Replace the FIRST occurrence of old_str with new_str in the specified file. Use this for making targeted edits.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path to the file." },
+          old_str: { type: "string", description: "The string to replace." },
+          new_str: { type: "string", description: "The replacement string." }
+        },
+        required: ["path", "old_str", "new_str"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_js",
+      description: "Execute JavaScript code in a sandboxed browser environment. All browser APIs are available (DOM, fetch, console, etc.). The code runs in an async wrapper so you can use top-level await. Returns stdout/stderr output and the return value.",
+      parameters: {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "JavaScript code to execute." }
+        },
+        required: ["code"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_files",
+      description: "List all files in the workspace.",
+      parameters: {
+        type: "object",
+        properties: {}
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_file",
+      description: "Delete a file from the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path to the file to delete." }
+        },
+        required: ["path"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "finish",
+      description: "Call this when you have completed the user's request. Provide a summary of what was done.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "Summary of what was done." }
+        },
+        required: ["message"]
+      }
+    }
+  }
+];
 
 function buildAPIMessages() {
   const msgs = [
     { role: 'system', content: SYSTEM_PROMPT },
-    ...messages.map(m => ({ role: m.role, content: m.content }))
+    ...messages.map(m => {
+      const msg = { role: m.role };
+      // OpenAI API requires content to be null (not a string) when tool_calls are present
+      if (m.tool_calls) {
+        msg.content = null;
+        msg.tool_calls = m.tool_calls;
+      } else if (m.content) {
+        msg.content = m.content;
+      }
+      if (m.tool_call_id) {
+        msg.tool_call_id = m.tool_call_id;
+      }
+      return msg;
+    })
   ];
   return msgs;
 }
@@ -561,33 +639,17 @@ async function callLLM() {
   const body = {
     model: model,
     messages: buildAPIMessages(),
+    tools: TOOLS,
+    tool_choice: "auto",
     temperature: 0.2,
     max_tokens: 4096
   };
 
-  // For Anthropic models, use different endpoint
   let url = `${apiUrl}/chat/completions`;
   let headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`
   };
-
-  if (model.startsWith('claude-')) {
-    // Use Anthropic API format
-    url = apiUrl.includes('anthropic') ? `${apiUrl}/messages` : 'https://api.anthropic.com/v1/messages';
-    headers = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    };
-    body.model = model;
-    body.max_tokens = 4096;
-    // Convert messages to Anthropic format
-    const sysMsg = body.messages.find(m => m.role === 'system');
-    const otherMsgs = body.messages.filter(m => m.role !== 'system');
-    body.system = sysMsg ? sysMsg.content : '';
-    body.messages = otherMsgs;
-  }
 
   try {
     const response = await fetch(url, {
@@ -602,52 +664,28 @@ async function callLLM() {
     }
 
     const data = await response.json();
+    const msg = data.choices?.[0]?.message;
 
-    let content;
-    if (model.startsWith('claude-')) {
-      content = data.content?.[0]?.text || '';
-    } else {
-      content = data.choices?.[0]?.message?.content || '';
-    }
-
-    return content;
+    return {
+      content: msg?.content || '',
+      tool_calls: msg?.tool_calls || []
+    };
   } catch (err) {
     addMessage('system', `❌ API Error: ${err.message}`);
     return null;
   }
 }
 
-function parseToolCalls(text) {
-  // Strip chat template artifacts like <|channel>thought<channel|> or <|im_start|> etc.
-  let cleaned = text.replace(/<\|?[^|>]+\|?>/g, '').trim();
-  // Strip any leading non-JSON text before the first { or [
-  const jsonStart = cleaned.search(/[\[{]/);
-  if (jsonStart > 0) {
-    cleaned = cleaned.slice(jsonStart);
-  }
-
-  try {
-    // Try to parse as JSON
-    const parsed = JSON.parse(cleaned);
-    return {
-      message: parsed.message || '',
-      tool_calls: parsed.tool_calls || []
-    };
-  } catch {
-    // Try to extract JSON from markdown code block
-    const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        return {
-          message: parsed.message || text,
-          tool_calls: parsed.tool_calls || []
-        };
-      } catch {}
-    }
-    // Return raw text as message with no tool calls
-    return { message: cleaned || text, tool_calls: [] };
-  }
+function parseToolCalls(response) {
+  // response is now { content, tool_calls } from the API
+  const tool_calls = (response.tool_calls || []).map(tc => ({
+    tool: tc.function.name,
+    params: JSON.parse(tc.function.arguments || '{}')
+  }));
+  return {
+    message: response.content || '',
+    tool_calls
+  };
 }
 
 async function executeToolCall(tc) {
@@ -721,26 +759,41 @@ async function processUserMessage(userText) {
 
     const parsed = parseToolCalls(response);
 
-    if (parsed.message) {
-      addMessage('assistant', parsed.message);
-      messages.push({ role: 'assistant', content: parsed.message });
-      saveMessages();
-    }
-
     if (!parsed.tool_calls || parsed.tool_calls.length === 0) {
+      if (parsed.message) {
+        addMessage('assistant', parsed.message);
+        messages.push({ role: 'assistant', content: parsed.message });
+        saveMessages();
+      }
       break;
     }
 
+    // Build the assistant message with tool_calls for the API
+    // content must be null when tool_calls are present (OpenAI API requirement)
+    const assistantMsg = {
+      role: 'assistant',
+      content: null,
+      tool_calls: response.tool_calls  // original tool_calls from API
+    };
+    messages.push(assistantMsg);
+    saveMessages();
+    // Show the message text in the UI separately
+    if (parsed.message) {
+      addMessage('assistant', parsed.message);
+    }
+
     // Execute all tool calls
-    let allResults = [];
     for (const tc of parsed.tool_calls) {
       const result = await executeToolCall(tc);
-      allResults.push({ tool: tc.tool, params: tc.params, result });
 
-      // Add result to messages
+      // Add result to messages using proper tool role format
       const resultStr = JSON.stringify(result, null, 2);
       addMessage('tool', `✅ ${tc.tool} result:\n${resultStr}`);
-      messages.push({ role: 'user', content: `Tool result for ${tc.tool}: ${resultStr}` });
+      messages.push({
+        role: 'tool',
+        tool_call_id: response.tool_calls.find(t => t.function.name === tc.tool)?.id || '',
+        content: resultStr
+      });
       saveMessages();
 
       // Check if finish was called
