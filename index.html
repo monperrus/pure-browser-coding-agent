@@ -270,11 +270,11 @@
 <div class="app" id="app">
   <!-- Chat Panel -->
   <div class="panel" id="chat-panel">
-    <div class="panel-header">
+    <div class="panel-header" id="panel-header" style="cursor:pointer">
       <span>💬 Chat</span>
       <span class="badge" id="model-badge">agent</span>
     </div>
-    <div id="settings-bar">
+    <div id="settings-bar" style="display:none">
       <label>API Key <input type="password" id="api-key-input" placeholder="sk-..."></label>
       <label>Model <input type="text" id="model-select" value="gpt-4o" style="width:140px"></label>
       <label>API URL <select id="api-url-input" style="width:200px"></select></label>
@@ -801,6 +801,12 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSettings();
   loadMessages();
   initSandbox();
+
+  // Toggle settings bar when clicking the panel header
+  document.getElementById('panel-header').onclick = () => {
+    const bar = document.getElementById('settings-bar');
+    bar.style.display = bar.style.display === 'none' ? '' : 'none';
+  };
 
   // Chat send
   document.getElementById('send-btn').onclick = async () => {
