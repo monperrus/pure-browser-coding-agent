@@ -355,6 +355,64 @@
     50% { content: '..'; }
     75% { content: '...'; }
   }
+
+  /* ── Mobile / narrow portrait layout ─────────────────────────── */
+  @media (max-width: 768px) {
+    body { overflow: auto; }
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: 100vh;
+      gap: 0;
+    }
+    .panel {
+      height: 50vh;
+      min-height: 300px;
+      flex-shrink: 0;
+    }
+    #chat-panel { height: 60vh; min-height: 400px; }
+    #files-panel { height: 50vh; min-height: 300px; }
+    #exec-panel { height: 40vh; min-height: 250px; }
+
+    #settings-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+      padding: 6px 8px;
+    }
+    #settings-bar label {
+      flex-wrap: wrap;
+      font-size: 10px;
+    }
+    #settings-bar input[type="password"] { width: 100%; }
+    #settings-bar input[type="text"] { width: 100% !important; }
+    #settings-bar select { width: 100% !important; }
+    #settings-bar .btn-small { font-size: 10px; padding: 2px 6px; }
+
+    #file-list { width: 120px; }
+    .file-tab { font-size: 10px; padding: 4px 8px; }
+    .editor-toolbar button { font-size: 10px; padding: 3px 6px; }
+
+    .input-area textarea { font-size: 12px; min-height: 36px; }
+    .input-area button { font-size: 12px; padding: 6px 12px; }
+
+    #exec-input-area textarea { font-size: 11px; }
+    #exec-input-area button { font-size: 11px; padding: 4px 8px; }
+
+    .msg { font-size: 12px; max-width: 95%; }
+  }
+
+  @media (max-width: 480px) {
+    .panel-header { font-size: 10px; padding: 4px 8px; }
+    .panel-header .badge { font-size: 8px; }
+    #chat-panel { height: 55vh; min-height: 350px; }
+    #files-panel { height: 45vh; min-height: 250px; }
+    #exec-panel { height: 35vh; min-height: 200px; }
+    #file-list { width: 100px; }
+    .file-item { font-size: 10px; padding: 3px 8px; }
+    #editor-area textarea { font-size: 11px; padding: 8px; }
+  }
 </style>
 </head>
 <body>
