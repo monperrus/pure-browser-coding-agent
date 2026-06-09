@@ -757,27 +757,39 @@ async function callLLM() {
     'Authorization': `Bearer ${apiKey}`
   };
 
+  let response;
   try {
-    const response = await fetch(url, {
+    response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body)
     });
+  } catch (networkErr) {
+    // fetch() itself threw — true network failure (DNS, CORS preflight, no connection)
+    addMessage('system', `❌ Network Error: Failed to connect to ${apiUrl}\nHTTP status: N/A\nDetails: ${networkErr.message}`);
+    return null;
+  }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`API error ${response.status}: ${errText}`);
+  if (!response.ok) {
+    let errText = '';
+    try {
+      errText = await response.text();
+    } catch (bodyErr) {
+      errText = `(could not read response body: ${bodyErr.message})`;
     }
+    addMessage('system', `❌ API Error\nHTTP status: ${response.status} ${response.statusText}\n${errText}`);
+    return null;
+  }
 
+  try {
     const data = await response.json();
     const msg = data.choices?.[0]?.message;
-
     return {
       content: msg?.content || '',
       tool_calls: msg?.tool_calls || []
     };
-  } catch (err) {
-    addMessage('system', `❌ API Error: ${err.message}`);
+  } catch (parseErr) {
+    addMessage('system', `❌ API Error: Failed to parse response JSON\nHTTP status: ${response.status} ${response.statusText}\nDetails: ${parseErr.message}`);
     return null;
   }
 }
