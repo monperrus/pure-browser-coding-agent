@@ -297,8 +297,6 @@
   <!-- Execution Panel (removed — exec results appear inline in chat) -->
 </div>
 
-<!-- Sandbox iframe (hidden) -->
-<iframe id="sandbox" style="display:none" sandbox="allow-scripts allow-same-origin"></iframe>
 
 <script>
 // ============================================================
@@ -364,101 +362,35 @@ function listFiles() {
 // ============================================================
 // 2. SANDBOXED CODE EXECUTION
 // ============================================================
-let execId = 0;
-const execCallbacks = {};
+const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
-function initSandbox() {
-  const iframe = document.getElementById('sandbox');
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open();
-  doc.write(`
-    <!DOCTYPE html>
-    <html><body>
-    <script>
-      // Minimal harness - exposes all browser APIs
-      const originalConsole = console;
-      const outputs = [];
-      function captureConsole() {
-        const methods = ['log','info','warn','error','debug','dir','table'];
-        methods.forEach(m => {
-          const orig = originalConsole[m];
-          console[m] = function(...args) {
-            outputs.push({ type: m === 'error' ? 'stderr' : 'stdout', text: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
-            orig.apply(originalConsole, args);
-          };
-        });
-      }
-      captureConsole();
-
-      // Handle execution requests
-      window.addEventListener('message', function(e) {
-        if (e.data && e.data.type === 'execute') {
-          const id = e.data.id;
-          const code = e.data.code;
-          outputs.length = 0;
-          let result, error = null;
-          try {
-            // Wrap in async function to support top-level await
-            const asyncFn = new AsyncFunction('"use strict"; ' + code);
-            const promise = asyncFn();
-            if (promise && typeof promise.then === 'function') {
-              promise.then(r => {
-                result = r;
-                parent.postMessage({ type: 'exec-result', id, result: formatResult(result), outputs: outputs.slice(), error: null }, '*');
-              }).catch(err => {
-                parent.postMessage({ type: 'exec-result', id, result: null, outputs: outputs.slice(), error: err.message }, '*');
-              });
-              return;
-            }
-            result = promise;
-          } catch(err) {
-            error = err.message;
-          }
-          parent.postMessage({ type: 'exec-result', id, result: formatResult(result), outputs: outputs.slice(), error }, '*');
-        }
-      });
-
-      function formatResult(r) {
-        if (r === undefined) return 'undefined';
-        if (r === null) return 'null';
-        try { return JSON.stringify(r, null, 2); } catch { return String(r); }
-      }
-
-      // AsyncFunction for top-level await support
-      var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-
-      parent.postMessage({ type: 'exec-ready' }, '*');
-    <\/script>
-    </body></html>
-  `);
-  doc.close();
+function formatResult(r) {
+  if (r === undefined) return 'undefined';
+  if (r === null) return 'null';
+  try { return JSON.stringify(r, null, 2); } catch { return String(r); }
 }
 
-function executeJS(code) {
-  return new Promise((resolve, reject) => {
-    const id = ++execId;
-    const iframe = document.getElementById('sandbox');
-    const timeout = setTimeout(() => reject(new Error('Execution timed out after 30s')), 30000);
-
-    execCallbacks[id] = (data) => {
-      clearTimeout(timeout);
-      delete execCallbacks[id];
-      resolve(data);
+async function executeJS(code) {
+  const outputs = [];
+  const origConsole = {};
+  const methods = ['log','info','warn','error','debug','dir','table'];
+  methods.forEach(m => {
+    origConsole[m] = console[m];
+    console[m] = function(...args) {
+      outputs.push({ type: m === 'error' ? 'stderr' : 'stdout', text: args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ') });
+      origConsole[m].apply(console, args);
     };
-
-    iframe.contentWindow.postMessage({ type: 'execute', id, code }, '*');
   });
+  try {
+    const fn = new AsyncFunction('"use strict"; ' + code);
+    const result = await fn();
+    return { result: formatResult(result), outputs, error: null };
+  } catch (err) {
+    return { result: null, outputs, error: err.message };
+  } finally {
+    methods.forEach(m => { console[m] = origConsole[m]; });
+  }
 }
-
-window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'exec-result') {
-    const cb = execCallbacks[e.data.id];
-    if (cb) cb(e.data);
-  }
-  if (e.data && e.data.type === 'exec-ready') {
-    console.log('[sandbox] ready');
-  }
-});
 
 // ============================================================
 // 3. CHAT / LLM INTEGRATION
@@ -976,7 +908,6 @@ function addExecMessage(text) {
 document.addEventListener('DOMContentLoaded', function() {
   loadSettings();
   loadMessages();
-  initSandbox();
 
   // Toggle settings bar when clicking the panel header
   document.getElementById('panel-header').onclick = () => {
