@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Browser Coding Agent</title>
+<title>JsChat</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -276,7 +276,7 @@
   <!-- Chat Panel -->
   <div class="panel" id="chat-panel">
     <div class="panel-header" id="panel-header" style="cursor:pointer">
-      <span>💬 Chat</span>
+      <span>💬 JsChat</span>
       <span class="badge" id="model-badge">agent</span>
     </div>
     <div id="settings-bar" style="display:none">
@@ -1071,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Welcome message
   if (messages.length === 0) {
-    addMessage('system', '🚀 Welcome to the Browser Coding Agent!\n\nSet your API key above, then ask me to write code. I can read/write files, execute JavaScript, and more.');
+    addMessage('system', '🚀 Welcome to JsChat, a browser agent!\n\nSet your API key above, then ask me to write code. I can read/write files, execute JavaScript, and more.');
   }
 });
 </script>
