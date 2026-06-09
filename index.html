@@ -80,12 +80,6 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .msg.code-block {
-    max-height: calc(7 * 1.5em + 16px);
-    overflow-y: auto;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 12px;
-  }
   .msg.exec {
     background: #1c2128;
     border: 1px solid #30363d;
@@ -97,6 +91,7 @@
     width: 100%;
     max-width: 100%;
   }
+  .msg.exec.code { max-height: calc(7 * 18px + 16px); }
   .msg.exec .exec-stdout { color: var(--text); }
   .msg.exec .exec-stderr { color: var(--danger); }
   .msg.exec .exec-system { color: var(--text-muted); font-style: italic; }
@@ -770,7 +765,7 @@ async function executeToolCall(tc) {
         result = strReplace(params.path, params.old_str, params.new_str);
         break;
       case 'execute_js':
-        addMessage('tool code-block', `🔧 execute_js:\n${params.code}`);
+        addExecMessage(`🔧 execute_js:\n${params.code}`, 'code');
         const execResult = await executeJS(params.code);
         let execLines = '';
         if (execResult.outputs && execResult.outputs.length > 0) {
@@ -908,10 +903,10 @@ function renderMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-function addExecMessage(text) {
+function addExecMessage(text, extraClass) {
   const container = document.getElementById('messages');
   const div = document.createElement('div');
-  div.className = 'msg exec';
+  div.className = extraClass ? `msg exec ${extraClass}` : 'msg exec';
   div.textContent = text;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
