@@ -536,7 +536,12 @@ function saveMessages() {
   localStorage.setItem(MSGS_KEY, JSON.stringify(messages));
 }
 
-const SYSTEM_PROMPT = `You are a browser-based coding agent. You have access to tools for reading/writing files, executing JavaScript, and more. Use the provided tools to complete the user's request. When finished, reply in plain text.
+const SYSTEM_PROMPT = `You are a browser-based coding agent. You have access to tools for reading/writing files, executing JavaScript, and more. Use the provided tools to complete the user's request. When finished, call the finish tool.
+
+## Execution environment
+- Code runs in a BROWSER context (Chrome). No Node.js APIs: no require(), no import(), no fs, no process.
+- Top-level await is supported. All browser APIs (fetch, DOM, console, etc.) are available.
+- To run a file you previously wrote, use execute_file(path, extra_code). It loads the file then runs extra_code in the same scope.
 
 ## Guidelines:
 - Always read a file before editing it.
@@ -596,13 +601,28 @@ const TOOLS = [
     type: "function",
     function: {
       name: "execute_js",
-      description: "Execute JavaScript code in a sandboxed browser environment. All browser APIs are available (DOM, fetch, console, etc.). The code runs in an async wrapper so you can use top-level await. Returns stdout/stderr output and the return value.",
+      description: "Execute JavaScript code in a browser (Chrome) environment. All browser APIs are available (DOM, fetch, console, etc.). Top-level await is supported. No Node.js APIs — no require(), no import(), no fs.",
       parameters: {
         type: "object",
         properties: {
           code: { type: "string", description: "JavaScript code to execute." }
         },
         required: ["code"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "execute_file",
+      description: "Load a JS file from the workspace and execute it, optionally followed by extra code in the same scope. Use this to run or test code you previously wrote to a file.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Path to the JS file to execute." },
+          extra_code: { type: "string", description: "Optional JavaScript to run after the file's code, in the same scope (e.g. to call a function defined in the file)." }
+        },
+        required: ["path"]
       }
     }
   },
@@ -784,6 +804,24 @@ async function executeToolCall(tc) {
             : { result: execResult.result, outputs: execResult.outputs, _execOutput: execLines };
         }
         break;
+      case 'execute_file': {
+        const fileResult = readFile(params.path);
+        if (fileResult.error) { result = fileResult; break; }
+        const combined = fileResult.content + (params.extra_code ? '\n' + params.extra_code : '');
+        addExecMessage(`🔧 execute_file: ${params.path}${params.extra_code ? '\n' + params.extra_code : ''}`, 'code');
+        const ef = await executeJS(combined);
+        let efLines = (ef.outputs || []).map(o => o.text).join('\n');
+        if (ef.error) {
+          efLines += (efLines ? '\n' : '') + `Error: ${ef.error}`;
+          result = { error: ef.error, outputs: ef.outputs, _execOutput: efLines };
+        } else {
+          if (ef.result !== 'undefined') efLines += (efLines ? '\n' : '') + `→ ${ef.result}`;
+          result = ef.result === 'undefined'
+            ? { outputs: ef.outputs, _execOutput: efLines }
+            : { result: ef.result, outputs: ef.outputs, _execOutput: efLines };
+        }
+        break;
+      }
       case 'list_files':
         result = { files: listFiles() };
         break;
