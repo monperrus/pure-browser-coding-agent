@@ -278,6 +278,7 @@
     <div class="panel-header" id="panel-header" style="cursor:pointer">
       <span>💬 JsChat</span>
       <span class="badge" id="model-badge">agent</span>
+      <button class="btn-small" id="clear-chat-btn" onclick="event.stopPropagation()" style="margin-left:auto">Clear Chat</button>
     </div>
     <div id="settings-bar" style="display:none">
       <label>Config <select id="config-select" style="width:160px"></select></label>
@@ -287,7 +288,6 @@
       <label>API Key <input type="password" id="api-key-input" placeholder="sk-..."></label>
       <label>Model <input type="text" id="model-select" value="gpt-4o" style="width:140px"></label>
       <label>API URL <select id="api-url-input" style="width:200px"></select></label>
-      <button class="btn-small" id="clear-chat-btn">Clear Chat</button>
     </div>
     <div id="messages"></div>
     <div class="input-area">
