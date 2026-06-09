@@ -278,7 +278,7 @@
     <div class="panel-header" id="panel-header" style="cursor:pointer">
       <span>💬 JsChat</span>
       <span class="badge" id="model-badge">agent</span>
-      <button class="btn-small" id="clear-chat-btn" onclick="event.stopPropagation()" style="margin-left:auto">Clear Chat</button>
+      <button class="btn-small" id="clear-chat-btn" style="margin-left:auto">Clear Chat</button>
     </div>
     <div id="settings-bar" style="display:none">
       <label>Config <select id="config-select" style="width:160px"></select></label>
@@ -1054,7 +1054,8 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   // Clear chat
-  document.getElementById('clear-chat-btn').onclick = () => {
+  document.getElementById('clear-chat-btn').onclick = (e) => {
+    e.stopPropagation();
     messages = [];
     saveMessages();
     renderMessages();
