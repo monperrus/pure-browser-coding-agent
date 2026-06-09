@@ -670,7 +670,7 @@ const TOOLS = [
 function buildAPIMessages() {
   const msgs = [
     { role: 'system', content: SYSTEM_PROMPT },
-    ...messages.map(m => {
+    ...messages.filter(m => m.role !== 'exec').map(m => {
       const msg = { role: m.role };
       // OpenAI API requires content to be null (not a string) when tool_calls are present
       if (m.tool_calls) {
@@ -940,7 +940,11 @@ function renderMessages() {
   container.innerHTML = '';
   messages.forEach(m => {
     const div = document.createElement('div');
-    div.className = `msg ${m.role}`;
+    if (m.role === 'exec') {
+      div.className = m.extraClass ? `msg exec ${m.extraClass}` : 'msg exec';
+    } else {
+      div.className = `msg ${m.role}`;
+    }
     div.textContent = m.content;
     container.appendChild(div);
   });
@@ -954,6 +958,8 @@ function addExecMessage(text, extraClass) {
   div.textContent = text;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
+  messages.push({ role: 'exec', content: text, extraClass: extraClass || null });
+  saveMessages();
 }
 
 // ============================================================
