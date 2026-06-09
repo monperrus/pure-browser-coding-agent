@@ -757,7 +757,7 @@ async function callLLM() {
     'Authorization': `Bearer ${apiKey}`
   };
 
-  const fetchOptions = { method: 'POST', headers, body: JSON.stringify(body) };
+  const fetchOptions = { method: 'POST', headers, body: JSON.stringify(body), mode: 'cors', credentials: 'omit' };
   let response;
   try {
     response = await fetch(url, fetchOptions);
