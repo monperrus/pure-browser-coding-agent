@@ -841,8 +841,8 @@ async function processUserMessage(userText) {
     messages.push(assistantMsg);
     saveMessages();
     // Show the message text in the UI separately
-    if (parsed.message) {
-      addMessage('assistant', parsed.message);
+    if (parsed.message && parsed.message.trim()) {
+      addMessage('assistant', parsed.message.trim());
     }
 
     // Execute all tool calls
