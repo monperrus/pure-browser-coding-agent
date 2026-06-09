@@ -751,7 +751,10 @@ async function callLLM() {
     max_tokens: 4096
   };
 
-  let url = `${apiUrl}/chat/completions`;
+  const qIdx = apiUrl.indexOf('?');
+  const url = qIdx === -1
+    ? `${apiUrl}/chat/completions`
+    : `${apiUrl.slice(0, qIdx)}/chat/completions${apiUrl.slice(qIdx)}`;
   let headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`
