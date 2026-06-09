@@ -86,7 +86,7 @@
     border: 1px solid #30363d;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 12px;
-    max-height: 300px;
+    max-height: calc(7 * 18px + 16px);
     overflow-y: auto;
     align-self: flex-start;
     width: 100%;
@@ -390,7 +390,7 @@ async function executeJS(code) {
     const result = await fn();
     return { result: formatResult(result), outputs, error: null };
   } catch (err) {
-    return { result: null, outputs, error: err.message };
+    return { result: null, outputs, error: err.stack || err.message };
   } finally {
     methods.forEach(m => { console[m] = origConsole[m]; });
   }
@@ -891,8 +891,13 @@ async function processUserMessage(userText) {
       const execOutput = result._execOutput;
       delete result._execOutput;
       const resultStr = JSON.stringify(result, null, 2);
-      addMessage('tool', `✅ ${tc.tool} result:\n${resultStr}`);
-      if (execOutput) addExecMessage(execOutput);
+      const isExecTool = tc.tool === 'execute_js' || tc.tool === 'execute_file';
+      if (isExecTool && !execOutput && !result.error) {
+        addExecMessage(`${tc.tool} completed without output`);
+      } else {
+        addMessage('tool', `✅ ${tc.tool} result:\n${resultStr}`);
+        if (execOutput) addExecMessage(execOutput);
+      }
       messages.push({
         role: 'tool',
         tool_call_id: response.tool_calls.find(t => t.function.name === tc.tool)?.id || '',
