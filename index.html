@@ -80,6 +80,12 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
+  .msg.code-block {
+    max-height: calc(7 * 1.5em + 16px);
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 12px;
+  }
   .msg.exec {
     background: #1c2128;
     border: 1px solid #30363d;
@@ -764,7 +770,7 @@ async function executeToolCall(tc) {
         result = strReplace(params.path, params.old_str, params.new_str);
         break;
       case 'execute_js':
-        addMessage('tool', `🔧 execute_js:\n${params.code}`);
+        addMessage('tool code-block', `🔧 execute_js:\n${params.code}`);
         const execResult = await executeJS(params.code);
         let execLines = '';
         if (execResult.outputs && execResult.outputs.length > 0) {
@@ -772,16 +778,15 @@ async function executeToolCall(tc) {
         }
         if (execResult.error) {
           execLines += (execLines ? '\n' : '') + `Error: ${execResult.error}`;
-          result = { error: execResult.error, outputs: execResult.outputs };
+          result = { error: execResult.error, outputs: execResult.outputs, _execOutput: execLines };
         } else {
           if (execResult.result !== 'undefined') {
             execLines += (execLines ? '\n' : '') + `→ ${execResult.result}`;
           }
           result = execResult.result === 'undefined'
-            ? { outputs: execResult.outputs }
-            : { result: execResult.result, outputs: execResult.outputs };
+            ? { outputs: execResult.outputs, _execOutput: execLines }
+            : { result: execResult.result, outputs: execResult.outputs, _execOutput: execLines };
         }
-        addExecMessage(execLines);
         break;
       case 'list_files':
         result = { files: listFiles() };
@@ -849,8 +854,11 @@ async function processUserMessage(userText) {
       const result = await executeToolCall(tc);
 
       // Add result to messages using proper tool role format
+      const execOutput = result._execOutput;
+      delete result._execOutput;
       const resultStr = JSON.stringify(result, null, 2);
       addMessage('tool', `✅ ${tc.tool} result:\n${resultStr}`);
+      if (execOutput) addExecMessage(execOutput);
       messages.push({
         role: 'tool',
         tool_call_id: response.tool_calls.find(t => t.function.name === tc.tool)?.id || '',
