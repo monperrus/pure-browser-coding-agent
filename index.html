@@ -745,7 +745,9 @@ function parseToolCalls(response) {
 
 async function executeToolCall(tc) {
   const { tool, params } = tc;
-  addMessage('tool', `🔧 Calling: ${tool}(${JSON.stringify(params)})`);
+  if (tool !== 'execute_js') {
+    addMessage('tool', `🔧 Calling: ${tool}(${JSON.stringify(params)})`);
+  }
 
   try {
     let result;
@@ -760,8 +762,8 @@ async function executeToolCall(tc) {
         result = strReplace(params.path, params.old_str, params.new_str);
         break;
       case 'execute_js':
+        addMessage('tool', `🔧 execute_js:\n${params.code}`);
         const execResult = await executeJS(params.code);
-        // Build inline exec message
         let execLines = '';
         if (execResult.outputs && execResult.outputs.length > 0) {
           execLines = execResult.outputs.map(o => o.text).join('\n');
@@ -770,10 +772,11 @@ async function executeToolCall(tc) {
           execLines += (execLines ? '\n' : '') + `Error: ${execResult.error}`;
           result = { error: execResult.error, outputs: execResult.outputs };
         } else {
-          execLines += (execLines ? '\n' : '') + `→ ${execResult.result}`;
+          if (execResult.result !== 'undefined') {
+            execLines += (execLines ? '\n' : '') + `→ ${execResult.result}`;
+          }
           result = { result: execResult.result, outputs: execResult.outputs };
         }
-        // Show exec output as a chat message with scrollable container
         addExecMessage(execLines);
         break;
       case 'list_files':
